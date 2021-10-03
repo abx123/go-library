@@ -42,11 +42,6 @@ type ImageLinks struct {
 	LargeImageURL string `json:"large_image_url"`
 }
 
-type LambdaError struct {
-	Code          int    `json:"code"`
-	PublicMessage string `json:"public_message"`
-}
-
 func main() {
 	lambda.Start(get)
 }
@@ -63,15 +58,10 @@ func get(ctx context.Context, request events.APIGatewayProxyRequest) (events.API
 		err = fmt.Errorf("missing ISBN13 or UserID")
 	}
 	if err != nil {
-		errObj := &LambdaError{
-			Code:          http.StatusBadRequest,
-			PublicMessage: err.Error(),
-		}
-		errBody, _ := json.Marshal(errObj)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusBadRequest,
 			Headers:    headers,
-			Body:       string(errBody),
+			Body:       err.Error(),
 		}, nil
 	}
 	client, _ := NewMongoClient()
@@ -79,15 +69,10 @@ func get(ctx context.Context, request events.APIGatewayProxyRequest) (events.API
 	collection := client.Database("library").Collection("books")
 	res, err := upsertMongo(collection, &req)
 	if err != nil {
-		errObj := &LambdaError{
-			Code:          http.StatusInternalServerError,
-			PublicMessage: err.Error(),
-		}
-		errBody, _ := json.Marshal(errObj)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusInternalServerError,
 			Headers:    headers,
-			Body:       string(errBody),
+			Body:       err.Error(),
 		}, nil
 	}
 	if res.MatchedCount == 1 {
