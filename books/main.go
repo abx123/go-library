@@ -13,6 +13,11 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 )
 
+type LambdaError struct {
+	Code          int    `json:"code"`
+	PublicMessage string `json:"public_message"`
+}
+
 func main() {
 	lambda.Start(get)
 }
@@ -29,18 +34,25 @@ func get(ctx context.Context, request events.APIGatewayProxyRequest) (events.API
 
 		book, err := gi.Get(isbn)
 		if err != nil {
+			errObj := &LambdaError{
+				Code:          http.StatusInternalServerError,
+				PublicMessage: err.Error(),
+			}
 			if err.Error() == "book not found" {
+				errObj.Code = http.StatusNotFound
+				errBody, _ := json.Marshal(errObj)
 				return events.APIGatewayProxyResponse{
 					StatusCode: http.StatusNotFound,
 					Headers:    headers,
-					Body:       err.Error(),
-				}, err
+					Body:       string(errBody),
+				}, nil
 			}
+			errBody, _ := json.Marshal(errObj)
 			return events.APIGatewayProxyResponse{
-				StatusCode: http.StatusInternalServerError,
+				StatusCode: http.StatusBadRequest,
 				Headers:    headers,
-				Body:       err.Error(),
-			}, err
+				Body:       string(errBody),
+			}, nil
 		}
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusOK,
@@ -48,11 +60,16 @@ func get(ctx context.Context, request events.APIGatewayProxyRequest) (events.API
 			Body:       formatResp(book),
 		}, nil
 	} else {
+		errObj := &LambdaError{
+			Code:          http.StatusBadRequest,
+			PublicMessage: fmt.Errorf("missing ISBN").Error(),
+		}
+		errBody, _ := json.Marshal(errObj)
 		return events.APIGatewayProxyResponse{
 			StatusCode: http.StatusBadRequest,
 			Headers:    headers,
-			Body:       "missing ISBN",
-		}, fmt.Errorf("missing ISBN")
+			Body:       string(errBody),
+		}, nil
 	}
 }
 
